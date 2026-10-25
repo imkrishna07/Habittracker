@@ -41,12 +41,14 @@ describe('habit management', () => {
     await user.click(checkbox)
     expect(screen.getByText('1 of 1 complete')).toBeTruthy()
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('100')
+    expect(screen.getByLabelText(/current streak 1 day, longest streak 1 day/i)).toBeTruthy()
     const completedData = JSON.parse(window.localStorage.getItem(HABIT_STORAGE_KEY) ?? '{}')
     expect(completedData.completions[localDateKey()]).toEqual([completedData.habits[0].id])
 
     await user.click(screen.getByRole('checkbox', { name: /mark incomplete: read for ten minutes/i }))
     expect(screen.getByText('0 of 1 complete')).toBeTruthy()
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0')
+    expect(screen.getByLabelText(/current streak 0 days, longest streak 0 days/i)).toBeTruthy()
     expect(JSON.parse(window.localStorage.getItem(HABIT_STORAGE_KEY) ?? '{}').completions[localDateKey()]).toBeUndefined()
 
     await user.click(screen.getByRole('checkbox', { name: /mark complete: read for ten minutes/i }))
