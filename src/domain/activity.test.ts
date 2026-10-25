@@ -62,4 +62,10 @@ describe('activity heatmap calculations', () => {
     expect(cells).toHaveLength(365)
     expect(cells[0]?.date).toBe('2025-10-26')
   })
+
+  it('starts calendar weeks on the configured weekday', () => {
+    const heatmap = buildActivityHeatmap([], {}, new Date(2026, 9, 25, 12), 1)
+    expect(heatmap.weeks[0][6]?.date).toBe('2025-10-26')
+    expect(heatmap.weeks[1][0]?.date).toBe('2025-10-27')
+  })
 })

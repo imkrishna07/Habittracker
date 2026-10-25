@@ -5,6 +5,7 @@ import {
   type Habit,
   type HabitData,
 } from './habits'
+import type { WeekStartsOn } from '../storage/preferences'
 
 export interface ActivityDay {
   date: string
@@ -26,12 +27,14 @@ export function buildActivityHeatmap(
   habits: Habit[],
   completions: HabitData['completions'],
   endDate = new Date(),
+  weekStartsOn: WeekStartsOn = 0,
 ): ActivityHeatmap {
   const endKey = localDateKey(endDate)
   const startKey = addDaysToKey(endKey, -(DAY_COUNT - 1))
   const startDay = dateFromKey(startKey).getDay()
-  const gridStart = addDaysToKey(startKey, -startDay)
-  const weekCount = Math.ceil((startDay + DAY_COUNT) / 7)
+  const leadingDays = (startDay - weekStartsOn + 7) % 7
+  const gridStart = addDaysToKey(startKey, -leadingDays)
+  const weekCount = Math.ceil((leadingDays + DAY_COUNT) / 7)
   const weeks: (ActivityDay | null)[][] = []
 
   for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {

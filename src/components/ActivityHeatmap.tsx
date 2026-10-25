@@ -1,27 +1,25 @@
 import type { CSSProperties } from 'react'
 import { buildActivityHeatmap, type ActivityDay } from '../domain/activity'
 import type { Habit, HabitData } from '../domain/habits'
+import type { WeekStartsOn } from '../storage/preferences'
 
 interface ActivityHeatmapProps {
   habits: Habit[]
   completions: HabitData['completions']
   endDate?: Date
+  weekStartsOn?: WeekStartsOn
 }
 
 const compactDate = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' })
 const monthDate = new Intl.DateTimeFormat('en', { month: 'short' })
-const weekdayRows = [
-  { label: '', aria: '' },
-  { label: 'Mon', aria: 'Monday' },
-  { label: '', aria: '' },
-  { label: 'Wed', aria: 'Wednesday' },
-  { label: '', aria: '' },
-  { label: 'Fri', aria: 'Friday' },
-  { label: '', aria: '' },
-]
+const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function ActivityHeatmap({ habits, completions, endDate = new Date() }: ActivityHeatmapProps) {
-  const heatmap = buildActivityHeatmap(habits, completions, endDate)
+export function ActivityHeatmap({ habits, completions, endDate = new Date(), weekStartsOn = 0 }: ActivityHeatmapProps) {
+  const heatmap = buildActivityHeatmap(habits, completions, endDate, weekStartsOn)
+  const weekdayRows = Array.from({ length: 7 }, (_, index) => {
+    const day = (weekStartsOn + index) % 7
+    return [1, 3, 5].includes(day) ? weekdayLabels[day] : ''
+  })
   const months = heatmap.weeks.flatMap((week, weekIndex) => {
     const firstDay = week.find((day): day is ActivityDay => day !== null)
     if (!firstDay) return []
@@ -49,7 +47,7 @@ export function ActivityHeatmap({ habits, completions, endDate = new Date() }: A
         </div>
         <div className="heatmap-layout">
           <div className="heatmap-weekdays" aria-hidden="true">
-            {weekdayRows.map((day, index) => <span key={index}>{day.label}</span>)}
+            {weekdayRows.map((day, index) => <span key={index}>{day}</span>)}
           </div>
           <div className="heatmap-grid" role="grid" aria-label="Habit completion activity over the last 12 months" aria-rowcount={7} aria-colcount={heatmap.weeks.length}>
             {heatmap.weeks.map((week, weekIndex) => (

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { localDateKey } from './domain/habits'
 import { HABIT_STORAGE_KEY } from './storage/habitStorage'
+import { PREFERENCES_STORAGE_KEY } from './storage/preferences'
 
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -120,5 +121,65 @@ describe('habit management', () => {
     expect(screen.getByLabelText('Daily reading completion rate').getAttribute('aria-valuenow')).toBe('100')
     await user.click(screen.getByRole('button', { name: '7 days' }))
     expect(screen.getByRole('button', { name: '7 days' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('saves appearance and week-start preferences across a refresh', async () => {
+    const user = userEvent.setup()
+    const view = render(<App />)
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    await user.click(screen.getByRole('button', { name: 'Light' }))
+    await user.selectOptions(screen.getByLabelText(/first day of the week/i), '1')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(JSON.parse(window.localStorage.getItem(PREFERENCES_STORAGE_KEY) ?? '{}')).toEqual({ theme: 'light', weekStartsOn: 1 })
+
+    view.unmount()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('button', { name: 'Light' }).getAttribute('aria-pressed')).toBe('true')
+    expect((screen.getByLabelText(/first day of the week/i) as HTMLSelectElement).value).toBe('1')
+  })
+
+  it('requires an explicit confirmation before clearing local data', async () => {
+    const user = userEvent.setup()
+    const stored = { habits: [], completions: { '2026-10-24': ['example'] } }
+    window.localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify(stored))
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    await user.click(screen.getByRole('button', { name: /clear data/i }))
+    expect(screen.getByRole('alertdialog', { name: /clear all local data/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(window.localStorage.getItem(HABIT_STORAGE_KEY)).toBe(JSON.stringify(stored))
+    await user.click(screen.getByRole('button', { name: /clear data/i }))
+    await user.click(screen.getByRole('alertdialog').querySelector('button.button-danger')!)
+    expect(window.localStorage.getItem(HABIT_STORAGE_KEY)).toBeNull()
+  })
+
+  it('previews a valid backup and leaves existing data untouched when restore is cancelled', async () => {
+    const user = userEvent.setup()
+    const current = { habits: [], completions: {} }
+    window.localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify(current))
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    const backup = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      data: { habits: [{ id: 'restored', name: 'Restored', description: '', schedule: { frequency: 'daily' }, createdAt: new Date().toISOString(), archived: false }], completions: { [localDateKey()]: ['restored'] } },
+      preferences: { theme: 'dark', weekStartsOn: 0 },
+    }
+    const file = new File([JSON.stringify(backup)], 'still-backup.json', { type: 'application/json' })
+    await user.upload(screen.getByLabelText(/choose still backup json file/i), file)
+    expect(await screen.findByRole('region', { name: /backup preview/i })).toBeTruthy()
+    expect(screen.getByRole('region', { name: /backup preview/i }).textContent).toContain('1 habit and 1 completion record')
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+    expect(window.localStorage.getItem(HABIT_STORAGE_KEY)).toBe(JSON.stringify(current))
+    expect(screen.queryByRole('region', { name: /backup preview/i })).toBeNull()
+
+    await user.upload(screen.getByLabelText(/choose still backup json file/i), file)
+    await screen.findByRole('region', { name: /backup preview/i })
+    await user.click(screen.getByRole('button', { name: /replace with this backup/i }))
+    await user.click(screen.getByRole('button', { name: /^today$/i }))
+    expect(screen.getByText('Restored')).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: /mark incomplete: restored/i }).getAttribute('aria-checked')).toBe('true')
   })
 })

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, Check, Circle, Command, Flame, Pencil, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Activity, ArrowUpRight, Check, Circle, Command, Flame, Pencil, Plus, Settings as SettingsIcon, Trash2 } from 'lucide-react'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HabitForm, type HabitDraft } from './components/HabitForm'
 import { InsightsPage } from './components/InsightsPage'
+import { SettingsPage } from './components/SettingsPage'
 import {
   createHabitId,
   changeHabitSchedule,
@@ -16,8 +17,10 @@ import {
 } from './domain/habits'
 import { calculateHabitStreaks } from './domain/streaks'
 import { loadHabitData, saveHabitData } from './storage/habitStorage'
+import { clearStoredApplicationData, restoreBackup, type StillBackup } from './storage/backup'
+import { DEFAULT_PREFERENCES, loadPreferences, savePreferences, type UserPreferences } from './storage/preferences'
 
-type Page = 'today' | 'habits' | 'insights'
+type Page = 'today' | 'habits' | 'insights' | 'settings'
 type ModalState = { type: 'create' } | { type: 'edit'; habit: Habit } | { type: 'delete'; habit: Habit } | null
 
 const todayLabel = new Intl.DateTimeFormat('en', {
@@ -29,11 +32,16 @@ const todayLabel = new Intl.DateTimeFormat('en', {
 function App() {
   const [initialData] = useState(loadHabitData)
   const [data, setData] = useState<HabitData>(initialData.data)
+  const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences)
   const [page, setPage] = useState<Page>('today')
   const [modal, setModal] = useState<ModalState>(null)
   const [storageError, setStorageError] = useState(
     initialData.recovered ? 'Some saved data could not be read. Your habits are safe to edit and save again.' : '',
   )
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = preferences.theme
+  }, [preferences.theme])
 
   const activeHabits = useMemo(() => data.habits.filter((habit) => !habit.archived), [data.habits])
   const today = new Date()
@@ -96,7 +104,26 @@ function App() {
     commit(toggleCompletion(data, habitId, todayKey))
   }
 
-  const currentTitle = page === 'today' ? 'Today' : page === 'habits' ? 'Habits' : 'Insights'
+  function updatePreferences(next: UserPreferences) {
+    savePreferences(next)
+    setPreferences(next)
+  }
+
+  function applyRestore(backup: StillBackup) {
+    restoreBackup(backup)
+    setData(backup.data)
+    setPreferences(backup.preferences)
+    setStorageError('')
+  }
+
+  function clearLocalData() {
+    clearStoredApplicationData()
+    setData({ habits: [], completions: {} })
+    setPreferences({ ...DEFAULT_PREFERENCES })
+    setStorageError('')
+  }
+
+  const currentTitle = page === 'today' ? 'Today' : page === 'habits' ? 'Habits' : page === 'insights' ? 'Insights' : 'Settings'
 
   return (
     <div className="app-frame">
@@ -120,6 +147,10 @@ function App() {
           <button className={`nav-item${page === 'insights' ? ' is-active' : ''}`} type="button" onClick={() => setPage('insights')} aria-current={page === 'insights' ? 'page' : undefined}>
             <Activity size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Insights</span>
+          </button>
+          <button className={`nav-item${page === 'settings' ? ' is-active' : ''}`} type="button" onClick={() => setPage('settings')} aria-current={page === 'settings' ? 'page' : undefined}>
+            <SettingsIcon size={16} strokeWidth={1.7} aria-hidden="true" />
+            <span>Settings</span>
           </button>
         </nav>
 
@@ -225,9 +256,10 @@ function App() {
               </section>
             )}
           </>
-        ) : <InsightsPage data={data} today={today} onCreateHabit={() => setModal({ type: 'create' })} />}
+        ) : page === 'insights' ? <InsightsPage data={data} today={today} onCreateHabit={() => setModal({ type: 'create' })} />
+          : <SettingsPage data={data} preferences={preferences} onPreferencesChange={updatePreferences} onRestore={applyRestore} onClear={clearLocalData} />}
 
-        {page === 'today' && activeHabits.length > 0 && <ActivityHeatmap habits={data.habits} completions={data.completions} endDate={today} />}
+        {page === 'today' && activeHabits.length > 0 && <ActivityHeatmap habits={data.habits} completions={data.completions} endDate={today} weekStartsOn={preferences.weekStartsOn} />}
 
         {storageError && <p className="storage-message" role="status">{storageError}</p>}
         <footer className="page-footer"><span>Consistency, at your own pace.</span><span className="footer-indicator"><span /> READY WHEN YOU ARE</span></footer>
