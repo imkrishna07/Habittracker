@@ -8,10 +8,80 @@ import { PREFERENCES_STORAGE_KEY } from './storage/preferences'
 
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+function dateOffsetKey(offset: number): string {
+  const date = new Date()
+  date.setHours(12, 0, 0, 0)
+  date.setDate(date.getDate() + offset)
+  return localDateKey(date)
+}
+
+function seedDailyHabits() {
+  const today = new Date()
+  const currentWeekday = today.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6
+  const createdAt = `${dateOffsetKey(-14)}T12:00:00`
+  const habitData = {
+    habits: [
+      { id: 'daily-read', name: 'Daily reading', description: '', schedule: { frequency: 'daily' }, createdAt, archived: false },
+      { id: 'weekly-walk', name: 'Weekly walk', description: '', schedule: { frequency: 'weekly', weekdays: [currentWeekday] }, createdAt, archived: false },
+    ],
+    completions: { [localDateKey()]: ['daily-read'] },
+  }
+  window.localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify(habitData))
+  return habitData
+}
+
 beforeEach(() => { window.localStorage.clear(); window.history.replaceState({}, '', '/') })
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
 describe('habit management', () => {
+  it('edits yesterday and last week independently, preserves today, and restores history after refresh', async () => {
+    const user = userEvent.setup()
+    seedDailyHabits()
+    const view = render(<App />)
+
+    expect(screen.getByRole('checkbox', { name: /mark incomplete: daily reading/i }).getAttribute('aria-checked')).toBe('true')
+    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    expect((screen.getByLabelText('Select activity date') as HTMLInputElement).value).toBe(dateOffsetKey(-1))
+    expect(screen.getByText(/historical activity ·/i)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Past practice' })).toBeTruthy()
+    expect(screen.queryByRole('checkbox', { name: /weekly walk/i })).toBeNull()
+    await user.click(screen.getByRole('checkbox', { name: /mark complete: daily reading/i }))
+    expect(JSON.parse(window.localStorage.getItem(HABIT_STORAGE_KEY) ?? '{}').completions[dateOffsetKey(-1)]).toEqual(['daily-read'])
+    expect(JSON.parse(window.localStorage.getItem(HABIT_STORAGE_KEY) ?? '{}').completions[localDateKey()]).toEqual(['daily-read'])
+
+    await user.click(screen.getByRole('button', { name: /return to today/i }))
+    expect(screen.getByRole('checkbox', { name: /mark incomplete: daily reading/i }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByLabelText(/current streak 2 days, longest streak 2 days/i)).toBeTruthy()
+
+    for (let day = 0; day < 7; day += 1) await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    expect((screen.getByLabelText('Select activity date') as HTMLInputElement).value).toBe(dateOffsetKey(-7))
+    expect(screen.getByRole('checkbox', { name: /mark complete: weekly walk/i }).getAttribute('aria-checked')).toBe('false')
+    await user.click(screen.getByRole('checkbox', { name: /mark complete: weekly walk/i }))
+    expect(JSON.parse(window.localStorage.getItem(HABIT_STORAGE_KEY) ?? '{}').completions[dateOffsetKey(-7)]).toContain('weekly-walk')
+    expect(screen.getByTitle(new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${dateOffsetKey(-7)}T12:00:00`)) + ' · 1 of 2 habits completed')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /insights/i }))
+    expect(Number(screen.getByRole('progressbar', { name: 'Weekly walk completion rate' }).getAttribute('aria-valuenow'))).toBeGreaterThan(0)
+
+    view.unmount()
+    render(<App />)
+    for (let day = 0; day < 7; day += 1) await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    expect(screen.getByRole('checkbox', { name: /mark incomplete: weekly walk/i }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('limits date selection to today and prevents moving forward into the future', async () => {
+    const user = userEvent.setup()
+    seedDailyHabits()
+    render(<App />)
+    const picker = screen.getByLabelText('Select activity date') as HTMLInputElement
+    expect(picker.max).toBe(localDateKey())
+    expect(screen.getByRole('button', { name: 'Next day' }).hasAttribute('disabled')).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    expect(screen.getByRole('button', { name: 'Next day' }).hasAttribute('disabled')).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Next day' }))
+    expect(picker.value).toBe(localDateKey())
+    expect(screen.getByRole('button', { name: 'Next day' }).hasAttribute('disabled')).toBe(true)
+  })
+
   it('opens an individual insight view by stable habit ID and returns to the prior page', async () => {
     const user = userEvent.setup()
     render(<App />)

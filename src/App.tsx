@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Archive, ArchiveRestore, ArrowUpRight, Check, Circle, Flame, Pencil, Plus, Settings as SettingsIcon, Trash2 } from 'lucide-react'
+import { Activity, Archive, ArchiveRestore, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, Circle, Flame, Pencil, Plus, Settings as SettingsIcon, Trash2 } from 'lucide-react'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HabitForm, type HabitDraft } from './components/HabitForm'
@@ -9,6 +9,8 @@ import { SettingsPage } from './components/SettingsPage'
 import {
   createHabitId,
   changeHabitSchedule,
+  getScheduleOnDate,
+  isHabitActiveOnDate,
   isScheduledOn,
   localDateKey,
   scheduleLabel,
@@ -29,6 +31,19 @@ const todayLabel = new Intl.DateTimeFormat('en', {
   month: 'long',
   day: 'numeric',
 }).format(new Date()).toUpperCase()
+const selectedDateLabel = new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+
+function addDaysToKey(dateKey: string, amount: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const date = new Date(year, month - 1, day, 12)
+  date.setDate(date.getDate() + amount)
+  return localDateKey(date)
+}
+
+function dateFromKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return new Date(year, month - 1, day, 12)
+}
 
 function getHabitIdFromHash(): string | null {
   if (typeof window === 'undefined' || !window.location.hash.startsWith('#habit/')) return null
@@ -39,6 +54,7 @@ function App() {
   const [initialData] = useState(loadHabitData)
   const [data, setData] = useState<HabitData>(initialData.data)
   const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences)
+  const [selectedDateKey, setSelectedDateKey] = useState(() => localDateKey())
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(getHabitIdFromHash)
   const [detailReturnPage, setDetailReturnPage] = useState<'today' | 'habits'>('habits')
   const [page, setPage] = useState<Page>(() => getHabitIdFromHash() ? 'habit-detail' : 'today')
@@ -70,13 +86,17 @@ function App() {
   const selectedHabit = data.habits.find((habit) => habit.id === selectedHabitId) ?? null
   const today = new Date()
   const todayKey = localDateKey(today)
-  const scheduledToday = activeHabits.filter((habit) => isScheduledOn(habit, today))
-  const completedToday = new Set(data.completions[todayKey] ?? [])
-  const completedCount = scheduledToday.filter((habit) => completedToday.has(habit.id)).length
-  const completionPercent = scheduledToday.length ? Math.round((completedCount / scheduledToday.length) * 100) : 0
+  const selectedDate = dateFromKey(selectedDateKey)
+  const viewingToday = selectedDateKey === todayKey
+  const scheduledForSelectedDate = data.habits.filter((habit) =>
+    isHabitActiveOnDate(habit, selectedDateKey) && isScheduledOn(habit, selectedDate),
+  )
+  const completedForSelectedDate = new Set(data.completions[selectedDateKey] ?? [])
+  const completedCount = scheduledForSelectedDate.filter((habit) => completedForSelectedDate.has(habit.id)).length
+  const completionPercent = scheduledForSelectedDate.length ? Math.round((completedCount / scheduledForSelectedDate.length) * 100) : 0
   const streaksById = useMemo(() => new Map(
-    activeHabits.map((habit) => [habit.id, calculateHabitStreaks(habit, data.completions, today)]),
-  ), [activeHabits, data.completions, todayKey])
+    data.habits.map((habit) => [habit.id, calculateHabitStreaks(habit, data.completions, today)]),
+  ), [data.habits, data.completions, todayKey])
 
   function commit(next: HabitData) {
     setData(next)
@@ -136,7 +156,7 @@ function App() {
   }
 
   function toggleHabit(habitId: string) {
-    commit(toggleCompletion(data, habitId, todayKey))
+    commit(toggleCompletion(data, habitId, selectedDateKey))
   }
 
   function openHabitDetail(habitId: string) {
@@ -156,6 +176,11 @@ function App() {
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`)
     setSelectedHabitId(null)
     setPage(nextPage)
+    if (nextPage === 'today') setSelectedDateKey(todayKey)
+  }
+
+  function selectDate(dateKey: string) {
+    if (dateKey <= todayKey && localDateKey(dateFromKey(dateKey)) === dateKey) setSelectedDateKey(dateKey)
   }
 
   function updatePreferences(next: UserPreferences) {
@@ -225,11 +250,29 @@ function App() {
         {page === 'today' ? (
           <>
             <section className="welcome-section" aria-labelledby="page-title">
-              <p className="eyebrow">{todayLabel}</p>
+              <p className="eyebrow">{viewingToday ? todayLabel : 'HISTORICAL ACTIVITY'}</p>
               <h1 id="page-title">A little, every day.</h1>
               <p className="welcome-copy">Make room for the things you want to become.</p>
             </section>
-            {activeHabits.length === 0 ? (
+            <section className="today-date-navigation" aria-label="Choose activity date">
+              <button className="date-step-button" type="button" aria-label="Previous day" title="Previous day"
+                onClick={() => selectDate(addDaysToKey(selectedDateKey, -1))}>
+                <ChevronLeft size={16} strokeWidth={1.8} />
+              </button>
+              <label className="date-picker-control">
+                <CalendarDays size={15} strokeWidth={1.7} aria-hidden="true" />
+                <span className="visually-hidden">Select activity date</span>
+                <input aria-label="Select activity date" type="date" value={selectedDateKey} max={todayKey}
+                  onChange={(event) => selectDate(event.currentTarget.value)} />
+              </label>
+              <button className="date-step-button" type="button" aria-label="Next day" title="Next day"
+                disabled={viewingToday} onClick={() => selectDate(addDaysToKey(selectedDateKey, 1))}>
+                <ChevronRight size={16} strokeWidth={1.8} />
+              </button>
+              {!viewingToday && <button className="button button-quiet date-today-button" type="button" aria-label="Return to today" onClick={() => selectDate(todayKey)}>Today</button>}
+              {!viewingToday && <span className="date-history-label">Historical activity · {selectedDateLabel.format(selectedDate)}</span>}
+            </section>
+            {data.habits.length === 0 ? (
               <section className="empty-state" aria-label="Getting started">
                 <div className="empty-mark" aria-hidden="true"><span className="empty-mark-ring" /><span className="empty-mark-dot" /></div>
                 <h2>Your day starts here</h2>
@@ -239,25 +282,26 @@ function App() {
                   <ArrowUpRight className="button-trailing-icon" size={14} strokeWidth={1.8} />
                 </button>
               </section>
-            ) : scheduledToday.length === 0 ? (
-              <section className="rest-state" aria-label="No habits scheduled today">
+            ) : scheduledForSelectedDate.length === 0 ? (
+              <section className="rest-state" aria-label="No habits scheduled for this date">
                 <div className="rest-mark" aria-hidden="true"><Circle size={20} strokeWidth={1.2} /></div>
                 <h2>A day to breathe.</h2>
-                <p>Nothing is scheduled for today. Your habits are right where you left them.</p>
+                <p>{viewingToday ? 'Nothing is scheduled for today. Your habits are right where you left them.' : 'Nothing is scheduled for this date. Your habits are right where you left them.'}</p>
                 <button className="button button-quiet" type="button" onClick={() => navigateTo('habits')}>View habits <ArrowUpRight size={14} /></button>
               </section>
             ) : (
               <section className="today-content" aria-labelledby="daily-list-title">
                 <div className="daily-summary">
-                  <div><h2 id="daily-list-title">Today’s practice</h2><p>{completedCount} of {scheduledToday.length} complete</p></div>
+                  <div><h2 id="daily-list-title">{viewingToday ? 'Today’s practice' : 'Past practice'}</h2><p>{completedCount} of {scheduledForSelectedDate.length} complete</p></div>
                   <div className="daily-percent" aria-label={`${completionPercent}% complete`}>{completionPercent}<span>%</span></div>
                 </div>
-                <div className="progress-track" role="progressbar" aria-label="Daily progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionPercent}>
+                <div className="progress-track" role="progressbar" aria-label={viewingToday ? 'Daily progress' : 'Historical daily progress'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionPercent}>
                   <span style={{ width: `${completionPercent}%` }} />
                 </div>
                 <ul className="daily-list">
-                  {scheduledToday.map((habit) => {
-                    const complete = completedToday.has(habit.id)
+                  {scheduledForSelectedDate.map((habit) => {
+                    const complete = completedForSelectedDate.has(habit.id)
+                    const selectedSchedule = getScheduleOnDate(habit, selectedDateKey) ?? habit.schedule
                     return (
                       <li className={`daily-row${complete ? ' is-complete' : ''}`} key={habit.id}>
                         <button className="completion-toggle" type="button" role="checkbox" aria-checked={complete}
@@ -269,7 +313,7 @@ function App() {
                           {habit.description && <span className="daily-habit-description">{habit.description}</span>}
                         </span>
                         <StreakIndicator habit={habit} current={streaksById.get(habit.id)?.current ?? 0} longest={streaksById.get(habit.id)?.longest ?? 0} />
-                        <span className="daily-schedule">{scheduleLabel(habit.schedule)}</span>
+                        <span className="daily-schedule">{scheduleLabel(selectedSchedule)}</span>
                       </li>
                     )
                   })}
@@ -326,7 +370,7 @@ function App() {
           : page === 'settings' ? <SettingsPage data={data} preferences={preferences} onPreferencesChange={updatePreferences} onRestore={applyRestore} onClear={clearLocalData} />
             : <HabitDetailPage habit={selectedHabit} data={data} today={today} weekStartsOn={preferences.weekStartsOn} onBack={closeHabitDetail} />}
 
-        {page === 'today' && activeHabits.length > 0 && <ActivityHeatmap habits={data.habits} completions={data.completions} endDate={today} weekStartsOn={preferences.weekStartsOn} />}
+        {page === 'today' && data.habits.length > 0 && <ActivityHeatmap habits={data.habits} completions={data.completions} endDate={today} weekStartsOn={preferences.weekStartsOn} />}
 
         {storageError && <p className="storage-message" role="status">{storageError}</p>}
         <footer className="page-footer"><span>Consistency, at your own pace.</span><span className="footer-indicator"><span /> READY WHEN YOU ARE</span></footer>
