@@ -98,6 +98,84 @@ h1 { margin: 0; font-size: clamp(27px, 3vw, 34px); line-height: 1.2; font-weight
 .footer-indicator { display: flex; align-items: center; gap: 7px; color: #686868; font-size: 9px; font-weight: 550; letter-spacing: 0.08em; }
 .footer-indicator span { width: 5px; height: 5px; border-radius: 50%; background: #858585; }
 
+/* Habit management */
+.nav-item { width: 100%; text-align: left; background: transparent; cursor: pointer; }
+.nav-count { min-width: 20px; margin-left: auto; color: #737373; font-size: 11px; text-align: right; }
+.today-content, .habits-content, .habits-empty { width: min(100%, 720px); margin-top: clamp(42px, 7vh, 66px); }
+.daily-summary { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 16px; }
+.daily-summary h2 { margin: 0; font-size: 14px; font-weight: 550; letter-spacing: -0.02em; }
+.daily-summary p { margin: 6px 0 0; color: #808080; font-size: 12px; }
+.daily-percent { color: #e8e8e8; font-size: 24px; font-weight: 450; letter-spacing: -0.06em; }
+.daily-percent span { margin-left: 2px; color: #818181; font-size: 12px; letter-spacing: 0; }
+.progress-track { height: 2px; overflow: hidden; background: #292929; }
+.progress-track span { height: 100%; display: block; background: #f0f0f0; transition: width 180ms ease; }
+.daily-list, .manage-list { padding: 0; margin: 0; list-style: none; }
+.daily-row { min-height: 68px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #222; }
+.completion-toggle { width: 19px; height: 19px; flex: 0 0 19px; display: grid; place-items: center; padding: 0; border: 1px solid #555; border-radius: 6px; color: #111; background: transparent; cursor: pointer; transition: background 140ms ease, border-color 140ms ease; }
+.completion-toggle:hover { border-color: #ddd; }
+.is-complete .completion-toggle { border-color: #f1f1f1; background: #f1f1f1; }
+.daily-habit-copy, .manage-habit-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.daily-habit-name { overflow: hidden; color: #e6e6e6; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.daily-habit-description { overflow: hidden; color: #797979; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.is-complete .daily-habit-name { color: #858585; text-decoration: line-through; text-decoration-color: #555; }
+.daily-schedule { color: #737373; font-size: 10px; white-space: nowrap; }
+.habits-heading { padding-top: clamp(52px, 8vh, 78px); }
+.habits-content { margin-top: 50px; }
+.list-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 0 12px; border-bottom: 1px solid #292929; color: #737373; font-size: 9px; font-weight: 600; letter-spacing: 0.11em; }
+.manage-row { min-height: 68px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #222; }
+.manage-meta { overflow: hidden; color: #777; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.manage-actions { display: flex; align-items: center; gap: 3px; }
+.manage-actions .icon-button { color: #777; }
+.manage-actions .icon-button:hover { color: #eee; }
+.delete-icon:hover { color: #f1f1f1 !important; background: #2a2a2a; }
+.habits-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; color: #8a8a8a; font-size: 13px; }
+.habits-empty p { margin: 0; }
+.rest-state { width: min(100%, 460px); margin: auto; padding: 0 0 56px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.rest-mark { width: 48px; height: 48px; display: grid; place-items: center; margin-bottom: 18px; border: 1px solid #292929; border-radius: 16px; color: #8a8a8a; background: #141414; }
+.rest-state h2 { margin: 0; font-size: 15px; font-weight: 550; letter-spacing: -0.025em; }
+.rest-state p { max-width: 330px; margin: 9px 0 13px; color: #858585; font-size: 12px; line-height: 1.75; }
+.storage-message { position: absolute; right: clamp(24px, 5vw, 72px); bottom: 60px; max-width: 420px; color: #999; font-size: 11px; text-align: right; }
+.modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 0.72); backdrop-filter: blur(4px); }
+.modal-panel { width: min(100%, 460px); padding: 24px; border: 1px solid #303030; border-radius: 12px; background: #141414; box-shadow: 0 24px 90px rgb(0 0 0 / 0.65); }
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid #262626; }
+.modal-eyebrow { margin: 0 0 7px; color: #757575; font-size: 9px; font-weight: 600; letter-spacing: 0.1em; }
+.modal-header h2 { margin: 0; color: #f0f0f0; font-size: 18px; font-weight: 500; letter-spacing: -0.04em; }
+.habit-form { display: grid; gap: 18px; padding-top: 20px; }
+.form-field { display: grid; gap: 8px; color: #c7c7c7; font-size: 11px; font-weight: 500; }
+.required-mark { color: #f1f1f1; }
+.optional-mark { margin-left: 5px; color: #686868; font-size: 8px; font-weight: 500; letter-spacing: 0.07em; }
+.input-control { outline: none; }
+.input-textarea { min-height: 68px; resize: vertical; padding: 10px 12px; line-height: 1.5; }
+.schedule-field { min-width: 0; padding: 0; margin: 0; border: 0; }
+.schedule-field legend { padding: 0; margin-bottom: 9px; color: #c7c7c7; font-size: 11px; font-weight: 500; }
+.schedule-options { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid #292929; border-radius: 8px; background: #101010; }
+.schedule-option { min-height: 31px; border: 1px solid transparent; border-radius: 5px; color: #888; background: transparent; font-size: 11px; cursor: pointer; }
+.schedule-option:hover { color: #ddd; }
+.schedule-option.is-selected { border-color: #303030; color: #eee; background: #202020; }
+.weekday-picker { display: flex; gap: 8px; margin-top: 13px; }
+.weekday-button { width: 31px; height: 31px; display: grid; place-items: center; padding: 0; border: 1px solid #333; border-radius: 50%; color: #858585; background: #151515; font-size: 10px; cursor: pointer; }
+.weekday-button:hover { border-color: #777; color: #eee; }
+.weekday-button.is-selected { border-color: #eee; color: #101010; background: #eee; }
+.form-error { margin: -5px 0 0; color: #c5c5c5; font-size: 11px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 18px; border-top: 1px solid #262626; }
+.button-quiet { color: #aaa; background: transparent; }
+.button-quiet:hover { color: #eee; background: #202020; }
+.button-danger { color: #111; background: #e8e8e8; }
+.button-danger:hover { background: #fff; }
+.confirm-copy { margin: 20px 0 0; color: #929292; font-size: 12px; line-height: 1.7; }
+.confirm-copy strong { color: #ddd; font-weight: 500; }
+.confirm-panel .modal-actions { margin-top: 22px; }
+
+@media (max-width: 680px) {
+  .today-content, .habits-content, .habits-empty { margin-top: 36px; }
+  .daily-row { gap: 11px; }
+  .daily-schedule { font-size: 9px; }
+  .modal-panel { padding: 20px; }
+  .weekday-picker { gap: 6px; }
+  .weekday-button { width: 29px; height: 29px; }
+  .storage-message { right: 20px; left: 20px; text-align: left; }
+}
+
 @media (max-width: 680px) {
   .sidebar { width: 62px; flex-basis: 62px; align-items: center; padding: 20px 8px 12px; }
   .brand { margin: 0 0 40px; }
