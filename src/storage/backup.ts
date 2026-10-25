@@ -99,8 +99,11 @@ export function downloadBackup(data: HabitData, preferences: UserPreferences): v
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = `still-backup-${backup.exportedAt.slice(0, 10)}.json`
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
   anchor.click()
-  URL.revokeObjectURL(url)
+  anchor.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export function restoreBackup(backup: StillBackup): void {

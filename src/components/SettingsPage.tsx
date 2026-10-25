@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { HabitData } from '../domain/habits'
 import { downloadBackup, validateBackup, type StillBackup } from '../storage/backup'
 import type { UserPreferences } from '../storage/preferences'
@@ -26,6 +26,15 @@ export function SettingsPage({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time zone'
+
+  useEffect(() => {
+    if (!confirmClear) return
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setConfirmClear(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [confirmClear])
 
   function changePreferences(next: UserPreferences) {
     try {
@@ -135,7 +144,7 @@ export function SettingsPage({
       {confirmClear && <div className="modal-backdrop" role="presentation"><section className="modal-panel confirm-panel" role="alertdialog" aria-modal="true" aria-labelledby="clear-title" aria-describedby="clear-copy">
         <header className="modal-header"><div><p className="modal-eyebrow">DATA MANAGEMENT</p><h2 id="clear-title">Clear all local data?</h2></div></header>
         <p className="confirm-copy" id="clear-copy">This permanently removes {data.habits.length} {data.habits.length === 1 ? 'habit' : 'habits'} and all completion history from this browser. Download a backup first if you may want to restore it.</p>
-        <div className="modal-actions"><button className="button button-quiet" type="button" onClick={() => setConfirmClear(false)}>Cancel</button><button className="button button-danger" type="button" onClick={clear}>Clear local data</button></div>
+        <div className="modal-actions"><button className="button button-quiet" type="button" autoFocus onClick={() => setConfirmClear(false)}>Cancel</button><button className="button button-danger" type="button" onClick={clear}>Clear local data</button></div>
       </section></div>}
     </>
   )

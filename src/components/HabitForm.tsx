@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
 import { WEEKDAYS, type Habit, type HabitSchedule, type Weekday } from '../domain/habits'
 
@@ -22,6 +22,14 @@ export function HabitForm({ initialHabit, onCancel, onSave }: HabitFormProps) {
     initialHabit?.schedule.frequency === 'weekly' ? initialHabit.schedule.weekdays : [],
   )
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
 
   function toggleWeekday(day: Weekday) {
     setWeekdays((current) => current.includes(day)

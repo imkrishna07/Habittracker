@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, Check, Circle, Command, Flame, Pencil, Plus, Settings as SettingsIcon, Trash2 } from 'lucide-react'
+import { Activity, Archive, ArchiveRestore, ArrowUpRight, Check, Circle, Flame, Pencil, Plus, Settings as SettingsIcon, Trash2 } from 'lucide-react'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HabitForm, type HabitDraft } from './components/HabitForm'
@@ -44,6 +44,7 @@ function App() {
   }, [preferences.theme])
 
   const activeHabits = useMemo(() => data.habits.filter((habit) => !habit.archived), [data.habits])
+  const archivedHabits = useMemo(() => data.habits.filter((habit) => habit.archived), [data.habits])
   const today = new Date()
   const todayKey = localDateKey(today)
   const scheduledToday = activeHabits.filter((habit) => isScheduledOn(habit, today))
@@ -100,6 +101,17 @@ function App() {
     setModal(null)
   }
 
+  function setHabitArchived(habitId: string, archived: boolean) {
+    const archiveDate = new Date()
+    archiveDate.setDate(archiveDate.getDate() + 1)
+    commit({
+      ...data,
+      habits: data.habits.map((habit) => habit.id === habitId
+        ? { ...habit, archived, archivedAt: archived ? localDateKey(archiveDate) : undefined }
+        : habit),
+    })
+  }
+
   function toggleHabit(habitId: string) {
     commit(toggleCompletion(data, habitId, todayKey))
   }
@@ -135,20 +147,20 @@ function App() {
 
         <div className="workspace-label">PERSONAL SPACE</div>
         <nav className="nav-list" aria-label="Pages">
-          <button className={`nav-item${page === 'today' ? ' is-active' : ''}`} type="button" onClick={() => setPage('today')} aria-current={page === 'today' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'today' ? ' is-active' : ''}`} type="button" aria-label="Today" onClick={() => setPage('today')} aria-current={page === 'today' ? 'page' : undefined}>
             <Circle size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Today</span>
           </button>
-          <button className={`nav-item${page === 'habits' ? ' is-active' : ''}`} type="button" onClick={() => setPage('habits')} aria-current={page === 'habits' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'habits' ? ' is-active' : ''}`} type="button" aria-label={`Habits, ${activeHabits.length} active`} onClick={() => setPage('habits')} aria-current={page === 'habits' ? 'page' : undefined}>
             <Check size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Habits</span>
             <span className="nav-count" aria-label={`${activeHabits.length} active habits`}>{activeHabits.length}</span>
           </button>
-          <button className={`nav-item${page === 'insights' ? ' is-active' : ''}`} type="button" onClick={() => setPage('insights')} aria-current={page === 'insights' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'insights' ? ' is-active' : ''}`} type="button" aria-label="Insights" onClick={() => setPage('insights')} aria-current={page === 'insights' ? 'page' : undefined}>
             <Activity size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Insights</span>
           </button>
-          <button className={`nav-item${page === 'settings' ? ' is-active' : ''}`} type="button" onClick={() => setPage('settings')} aria-current={page === 'settings' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'settings' ? ' is-active' : ''}`} type="button" aria-label="Settings" onClick={() => setPage('settings')} aria-current={page === 'settings' ? 'page' : undefined}>
             <SettingsIcon size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Settings</span>
           </button>
@@ -157,7 +169,6 @@ function App() {
         <div className="sidebar-bottom">
           <span className="avatar" aria-hidden="true">Y</span>
           <span className="profile-name">Your space</span>
-          <button className="icon-button" type="button" aria-label="Keyboard shortcuts"><Command size={15} strokeWidth={1.7} /></button>
         </div>
       </aside>
 
@@ -247,6 +258,7 @@ function App() {
                         <StreakIndicator habit={habit} current={streaksById.get(habit.id)?.current ?? 0} longest={streaksById.get(habit.id)?.longest ?? 0} />
                       </div>
                       <div className="manage-actions">
+                        <button className="icon-button" type="button" aria-label={`Archive ${habit.name}`} onClick={() => setHabitArchived(habit.id, true)}><Archive size={15} strokeWidth={1.7} /></button>
                         <button className="icon-button" type="button" aria-label={`Edit ${habit.name}`} onClick={() => setModal({ type: 'edit', habit })}><Pencil size={15} strokeWidth={1.7} /></button>
                         <button className="icon-button delete-icon" type="button" aria-label={`Delete ${habit.name}`} onClick={() => setModal({ type: 'delete', habit })}><Trash2 size={15} strokeWidth={1.7} /></button>
                       </div>
@@ -255,6 +267,18 @@ function App() {
                 </ul>
               </section>
             )}
+            {archivedHabits.length > 0 && <section className="habits-content archived-content" aria-label="Archived habits">
+              <div className="list-heading"><span>ARCHIVED</span><span>{archivedHabits.length} {archivedHabits.length === 1 ? 'HABIT' : 'HABITS'}</span></div>
+              <ul className="manage-list">
+                {archivedHabits.map((habit) => <li className="manage-row archived-row" key={habit.id}>
+                  <div className="manage-habit-copy"><span className="daily-habit-name">{habit.name}</span><span className="manage-meta">{scheduleLabel(habit.schedule)}{habit.description ? ` · ${habit.description}` : ''}</span></div>
+                  <div className="manage-actions">
+                    <button className="icon-button" type="button" aria-label={`Restore ${habit.name}`} onClick={() => setHabitArchived(habit.id, false)}><ArchiveRestore size={15} strokeWidth={1.7} /></button>
+                    <button className="icon-button delete-icon" type="button" aria-label={`Delete ${habit.name}`} onClick={() => setModal({ type: 'delete', habit })}><Trash2 size={15} strokeWidth={1.7} /></button>
+                  </div>
+                </li>)}
+              </ul>
+            </section>}
           </>
         ) : page === 'insights' ? <InsightsPage data={data} today={today} onCreateHabit={() => setModal({ type: 'create' })} />
           : <SettingsPage data={data} preferences={preferences} onPreferencesChange={updatePreferences} onRestore={applyRestore} onClear={clearLocalData} />}

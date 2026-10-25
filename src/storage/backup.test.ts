@@ -23,15 +23,24 @@ describe('versioned Still backups', () => {
     expect(validateBackup(backup)).toMatchObject({ habitCount: 1, completionRecordCount: 1 })
   })
 
-  it('downloads a JSON blob with a backup filename', () => {
+  it('downloads a valid JSON blob with a backup filename', async () => {
     let downloadedBlob: Blob | undefined
-    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    let downloadName = ''
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { downloadName = this.download })
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (blob: Blob) => { downloadedBlob = blob; return 'blob:still-backup' } })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
     downloadBackup(data, DEFAULT_PREFERENCES)
     expect(downloadedBlob?.type).toBe('application/json')
     expect(downloadedBlob?.size).toBeGreaterThan(0)
+    expect(downloadName).toMatch(/^still-backup-\d{4}-\d{2}-\d{2}\.json$/)
     expect(anchorClick).toHaveBeenCalledOnce()
+    const serialized = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('No blob text'))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(downloadedBlob!)
+    })
+    expect(validateBackup(JSON.parse(serialized)).habitCount).toBe(1)
     anchorClick.mockRestore()
   })
 

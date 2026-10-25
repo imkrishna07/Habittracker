@@ -74,4 +74,18 @@ describe('calculateInsights', () => {
     expect(one.mostConsistent?.rate).toBe(0)
     expect(one.leastConsistent).toBeNull()
   })
+
+  it('keeps local calendar dates consecutive across the spring daylight-saving change', () => {
+    const data: HabitData = {
+      habits: [habit('dst', '2026-03-07', daily)],
+      completions: { '2026-03-07': ['dst'], '2026-03-08': ['dst'] },
+    }
+    const result = calculateInsights(data, '7d', new Date(2026, 2, 9, 12))
+    expect(result.days).toHaveLength(7)
+    expect(result.days[4]?.date).toBe('2026-03-07')
+    expect(result.days[5]?.date).toBe('2026-03-08')
+    expect(result.days[6]?.date).toBe('2026-03-09')
+    expect(result.scheduledOccurrences).toBe(3)
+    expect(result.completedOccurrences).toBe(2)
+  })
 })
