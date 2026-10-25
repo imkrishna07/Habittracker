@@ -4,6 +4,7 @@ import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HabitForm, type HabitDraft } from './components/HabitForm'
 import { InsightsPage } from './components/InsightsPage'
+import { HabitDetailPage } from './components/HabitDetailPage'
 import { SettingsPage } from './components/SettingsPage'
 import {
   createHabitId,
@@ -20,7 +21,7 @@ import { loadHabitData, saveHabitData } from './storage/habitStorage'
 import { clearStoredApplicationData, restoreBackup, type StillBackup } from './storage/backup'
 import { DEFAULT_PREFERENCES, loadPreferences, savePreferences, type UserPreferences } from './storage/preferences'
 
-type Page = 'today' | 'habits' | 'insights' | 'settings'
+type Page = 'today' | 'habits' | 'insights' | 'settings' | 'habit-detail'
 type ModalState = { type: 'create' } | { type: 'edit'; habit: Habit } | { type: 'delete'; habit: Habit } | null
 
 const todayLabel = new Intl.DateTimeFormat('en', {
@@ -29,11 +30,18 @@ const todayLabel = new Intl.DateTimeFormat('en', {
   day: 'numeric',
 }).format(new Date()).toUpperCase()
 
+function getHabitIdFromHash(): string | null {
+  if (typeof window === 'undefined' || !window.location.hash.startsWith('#habit/')) return null
+  try { return decodeURIComponent(window.location.hash.slice('#habit/'.length)) } catch { return null }
+}
+
 function App() {
   const [initialData] = useState(loadHabitData)
   const [data, setData] = useState<HabitData>(initialData.data)
   const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences)
-  const [page, setPage] = useState<Page>('today')
+  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(getHabitIdFromHash)
+  const [detailReturnPage, setDetailReturnPage] = useState<'today' | 'habits'>('habits')
+  const [page, setPage] = useState<Page>(() => getHabitIdFromHash() ? 'habit-detail' : 'today')
   const [modal, setModal] = useState<ModalState>(null)
   const [storageError, setStorageError] = useState(
     initialData.recovered ? 'Some saved data could not be read. Your habits are safe to edit and save again.' : '',
@@ -43,8 +51,23 @@ function App() {
     document.documentElement.dataset.theme = preferences.theme
   }, [preferences.theme])
 
+  useEffect(() => {
+    function syncRoute() {
+      const habitId = getHabitIdFromHash()
+      setSelectedHabitId(habitId)
+      setPage(habitId ? 'habit-detail' : detailReturnPage)
+    }
+    window.addEventListener('popstate', syncRoute)
+    window.addEventListener('hashchange', syncRoute)
+    return () => {
+      window.removeEventListener('popstate', syncRoute)
+      window.removeEventListener('hashchange', syncRoute)
+    }
+  }, [detailReturnPage])
+
   const activeHabits = useMemo(() => data.habits.filter((habit) => !habit.archived), [data.habits])
   const archivedHabits = useMemo(() => data.habits.filter((habit) => habit.archived), [data.habits])
+  const selectedHabit = data.habits.find((habit) => habit.id === selectedHabitId) ?? null
   const today = new Date()
   const todayKey = localDateKey(today)
   const scheduledToday = activeHabits.filter((habit) => isScheduledOn(habit, today))
@@ -116,6 +139,25 @@ function App() {
     commit(toggleCompletion(data, habitId, todayKey))
   }
 
+  function openHabitDetail(habitId: string) {
+    if (page !== 'habit-detail') setDetailReturnPage(page === 'today' ? 'today' : 'habits')
+    window.history.pushState({}, '', `#habit/${encodeURIComponent(habitId)}`)
+    setSelectedHabitId(habitId)
+    setPage('habit-detail')
+  }
+
+  function closeHabitDetail() {
+    window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`)
+    setSelectedHabitId(null)
+    setPage(detailReturnPage)
+  }
+
+  function navigateTo(nextPage: Exclude<Page, 'habit-detail'>) {
+    window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`)
+    setSelectedHabitId(null)
+    setPage(nextPage)
+  }
+
   function updatePreferences(next: UserPreferences) {
     savePreferences(next)
     setPreferences(next)
@@ -135,32 +177,32 @@ function App() {
     setStorageError('')
   }
 
-  const currentTitle = page === 'today' ? 'Today' : page === 'habits' ? 'Habits' : page === 'insights' ? 'Insights' : 'Settings'
+  const currentTitle = page === 'today' ? 'Today' : page === 'habits' ? 'Habits' : page === 'insights' ? 'Insights' : page === 'settings' ? 'Settings' : selectedHabit?.name ?? 'Habit'
 
   return (
     <div className="app-frame">
       <aside className="sidebar" aria-label="Main navigation">
-        <a className="brand" href="#today" aria-label="Still home" onClick={(event) => { event.preventDefault(); setPage('today') }}>
+        <a className="brand" href="#today" aria-label="Still home" onClick={(event) => { event.preventDefault(); navigateTo('today') }}>
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>still</span>
         </a>
 
         <div className="workspace-label">PERSONAL SPACE</div>
         <nav className="nav-list" aria-label="Pages">
-          <button className={`nav-item${page === 'today' ? ' is-active' : ''}`} type="button" aria-label="Today" onClick={() => setPage('today')} aria-current={page === 'today' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'today' || (page === 'habit-detail' && detailReturnPage === 'today') ? ' is-active' : ''}`} type="button" aria-label="Today" onClick={() => navigateTo('today')} aria-current={page === 'today' || (page === 'habit-detail' && detailReturnPage === 'today') ? 'page' : undefined}>
             <Circle size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Today</span>
           </button>
-          <button className={`nav-item${page === 'habits' ? ' is-active' : ''}`} type="button" aria-label={`Habits, ${activeHabits.length} active`} onClick={() => setPage('habits')} aria-current={page === 'habits' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'habits' || (page === 'habit-detail' && detailReturnPage === 'habits') ? ' is-active' : ''}`} type="button" aria-label={`Habits, ${activeHabits.length} active`} onClick={() => navigateTo('habits')} aria-current={page === 'habits' || (page === 'habit-detail' && detailReturnPage === 'habits') ? 'page' : undefined}>
             <Check size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Habits</span>
             <span className="nav-count" aria-label={`${activeHabits.length} active habits`}>{activeHabits.length}</span>
           </button>
-          <button className={`nav-item${page === 'insights' ? ' is-active' : ''}`} type="button" aria-label="Insights" onClick={() => setPage('insights')} aria-current={page === 'insights' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'insights' ? ' is-active' : ''}`} type="button" aria-label="Insights" onClick={() => navigateTo('insights')} aria-current={page === 'insights' ? 'page' : undefined}>
             <Activity size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Insights</span>
           </button>
-          <button className={`nav-item${page === 'settings' ? ' is-active' : ''}`} type="button" aria-label="Settings" onClick={() => setPage('settings')} aria-current={page === 'settings' ? 'page' : undefined}>
+          <button className={`nav-item${page === 'settings' ? ' is-active' : ''}`} type="button" aria-label="Settings" onClick={() => navigateTo('settings')} aria-current={page === 'settings' ? 'page' : undefined}>
             <SettingsIcon size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Settings</span>
           </button>
@@ -202,7 +244,7 @@ function App() {
                 <div className="rest-mark" aria-hidden="true"><Circle size={20} strokeWidth={1.2} /></div>
                 <h2>A day to breathe.</h2>
                 <p>Nothing is scheduled for today. Your habits are right where you left them.</p>
-                <button className="button button-quiet" type="button" onClick={() => setPage('habits')}>View habits <ArrowUpRight size={14} /></button>
+                <button className="button button-quiet" type="button" onClick={() => navigateTo('habits')}>View habits <ArrowUpRight size={14} /></button>
               </section>
             ) : (
               <section className="today-content" aria-labelledby="daily-list-title">
@@ -223,7 +265,7 @@ function App() {
                           {complete && <Check size={13} strokeWidth={2} />}
                         </button>
                         <span className="daily-habit-copy">
-                          <span className="daily-habit-name">{habit.name}</span>
+                          <button className="daily-habit-name habit-detail-link" type="button" aria-label={`View details for ${habit.name}`} onClick={() => openHabitDetail(habit.id)}>{habit.name}</button>
                           {habit.description && <span className="daily-habit-description">{habit.description}</span>}
                         </span>
                         <StreakIndicator habit={habit} current={streaksById.get(habit.id)?.current ?? 0} longest={streaksById.get(habit.id)?.longest ?? 0} />
@@ -253,7 +295,7 @@ function App() {
                   {activeHabits.map((habit) => (
                     <li className="manage-row" key={habit.id}>
                       <div className="manage-habit-copy">
-                        <span className="daily-habit-name">{habit.name}</span>
+                        <button className="daily-habit-name habit-detail-link" type="button" aria-label={`View details for ${habit.name}`} onClick={() => openHabitDetail(habit.id)}>{habit.name}</button>
                         <span className="manage-meta">{scheduleLabel(habit.schedule)}{habit.description ? ` · ${habit.description}` : ''}</span>
                         <StreakIndicator habit={habit} current={streaksById.get(habit.id)?.current ?? 0} longest={streaksById.get(habit.id)?.longest ?? 0} />
                       </div>
@@ -271,7 +313,7 @@ function App() {
               <div className="list-heading"><span>ARCHIVED</span><span>{archivedHabits.length} {archivedHabits.length === 1 ? 'HABIT' : 'HABITS'}</span></div>
               <ul className="manage-list">
                 {archivedHabits.map((habit) => <li className="manage-row archived-row" key={habit.id}>
-                  <div className="manage-habit-copy"><span className="daily-habit-name">{habit.name}</span><span className="manage-meta">{scheduleLabel(habit.schedule)}{habit.description ? ` · ${habit.description}` : ''}</span></div>
+                  <div className="manage-habit-copy"><button className="daily-habit-name habit-detail-link" type="button" aria-label={`View details for ${habit.name}`} onClick={() => openHabitDetail(habit.id)}>{habit.name}</button><span className="manage-meta">{scheduleLabel(habit.schedule)}{habit.description ? ` · ${habit.description}` : ''}</span></div>
                   <div className="manage-actions">
                     <button className="icon-button" type="button" aria-label={`Restore ${habit.name}`} onClick={() => setHabitArchived(habit.id, false)}><ArchiveRestore size={15} strokeWidth={1.7} /></button>
                     <button className="icon-button delete-icon" type="button" aria-label={`Delete ${habit.name}`} onClick={() => setModal({ type: 'delete', habit })}><Trash2 size={15} strokeWidth={1.7} /></button>
@@ -281,7 +323,8 @@ function App() {
             </section>}
           </>
         ) : page === 'insights' ? <InsightsPage data={data} today={today} onCreateHabit={() => setModal({ type: 'create' })} />
-          : <SettingsPage data={data} preferences={preferences} onPreferencesChange={updatePreferences} onRestore={applyRestore} onClear={clearLocalData} />}
+          : page === 'settings' ? <SettingsPage data={data} preferences={preferences} onPreferencesChange={updatePreferences} onRestore={applyRestore} onClear={clearLocalData} />
+            : <HabitDetailPage habit={selectedHabit} data={data} today={today} weekStartsOn={preferences.weekStartsOn} onBack={closeHabitDetail} />}
 
         {page === 'today' && activeHabits.length > 0 && <ActivityHeatmap habits={data.habits} completions={data.completions} endDate={today} weekStartsOn={preferences.weekStartsOn} />}
 

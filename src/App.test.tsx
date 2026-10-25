@@ -8,10 +8,32 @@ import { PREFERENCES_STORAGE_KEY } from './storage/preferences'
 
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-beforeEach(() => window.localStorage.clear())
-afterEach(() => cleanup())
+beforeEach(() => { window.localStorage.clear(); window.history.replaceState({}, '', '/') })
+afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
 describe('habit management', () => {
+  it('opens an individual insight view by stable habit ID and returns to the prior page', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /create your first habit/i }))
+    await user.type(screen.getByPlaceholderText(/read for 10 minutes/i), 'Read nightly')
+    await user.click(screen.getByRole('button', { name: /^create habit$/i }))
+    const stored = JSON.parse(window.localStorage.getItem(HABIT_STORAGE_KEY) ?? '{}')
+    await user.click(screen.getByRole('button', { name: 'View details for Read nightly' }))
+    expect(screen.getByRole('heading', { name: 'Read nightly' })).toBeTruthy()
+    expect(window.location.hash).toBe(`#habit/${stored.habits[0].id}`)
+    expect(screen.getByRole('heading', { name: 'Weekly consistency' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /^back$/i }))
+    expect(screen.getByRole('heading', { name: /a little, every day/i })).toBeTruthy()
+  })
+
+  it('shows a safe not-found page for an unknown habit ID', () => {
+    window.history.replaceState({}, '', '#habit/unknown')
+    render(<App />)
+    expect(screen.getByRole('heading', { name: /habit not found/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /back to habits/i })).toBeTruthy()
+  })
+
   it('opens the same creation form from both buttons and validates a blank name', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)
