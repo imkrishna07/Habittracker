@@ -100,4 +100,25 @@ describe('habit management', () => {
     expect(screen.getByText(/some saved data could not be read/i)).toBeTruthy()
     expect(screen.getByText(/your day starts here/i)).toBeTruthy()
   })
+
+  it('adds Insights navigation and updates metrics immediately when a completion changes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /create your first habit/i }))
+    await user.type(screen.getByPlaceholderText(/read for 10 minutes/i), 'Daily reading')
+    await user.click(screen.getByRole('button', { name: /^create habit$/i }))
+
+    await user.click(screen.getByRole('button', { name: /insights/i }))
+    expect(screen.getByRole('heading', { name: 'Insights' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '30 days' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('0 of 1 scheduled')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /^today$/i }))
+    await user.click(screen.getByRole('checkbox', { name: /mark complete: daily reading/i }))
+    await user.click(screen.getByRole('button', { name: /insights/i }))
+    expect(screen.getByText('1 of 1 scheduled')).toBeTruthy()
+    expect(screen.getByLabelText('Daily reading completion rate').getAttribute('aria-valuenow')).toBe('100')
+    await user.click(screen.getByRole('button', { name: '7 days' }))
+    expect(screen.getByRole('button', { name: '7 days' }).getAttribute('aria-pressed')).toBe('true')
+  })
 })

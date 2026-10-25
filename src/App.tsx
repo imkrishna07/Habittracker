@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, Check, Circle, Command, Flame, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Activity, ArrowUpRight, Check, Circle, Command, Flame, Pencil, Plus, Trash2 } from 'lucide-react'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HabitForm, type HabitDraft } from './components/HabitForm'
+import { InsightsPage } from './components/InsightsPage'
 import {
   createHabitId,
   changeHabitSchedule,
@@ -16,7 +17,7 @@ import {
 import { calculateHabitStreaks } from './domain/streaks'
 import { loadHabitData, saveHabitData } from './storage/habitStorage'
 
-type Page = 'today' | 'habits'
+type Page = 'today' | 'habits' | 'insights'
 type ModalState = { type: 'create' } | { type: 'edit'; habit: Habit } | { type: 'delete'; habit: Habit } | null
 
 const todayLabel = new Intl.DateTimeFormat('en', {
@@ -95,7 +96,7 @@ function App() {
     commit(toggleCompletion(data, habitId, todayKey))
   }
 
-  const currentTitle = page === 'today' ? 'Today' : 'Habits'
+  const currentTitle = page === 'today' ? 'Today' : page === 'habits' ? 'Habits' : 'Insights'
 
   return (
     <div className="app-frame">
@@ -115,6 +116,10 @@ function App() {
             <Check size={16} strokeWidth={1.7} aria-hidden="true" />
             <span>Habits</span>
             <span className="nav-count" aria-label={`${activeHabits.length} active habits`}>{activeHabits.length}</span>
+          </button>
+          <button className={`nav-item${page === 'insights' ? ' is-active' : ''}`} type="button" onClick={() => setPage('insights')} aria-current={page === 'insights' ? 'page' : undefined}>
+            <Activity size={16} strokeWidth={1.7} aria-hidden="true" />
+            <span>Insights</span>
           </button>
         </nav>
 
@@ -188,7 +193,7 @@ function App() {
               </section>
             )}
           </>
-        ) : (
+        ) : page === 'habits' ? (
           <>
             <section className="welcome-section habits-heading" aria-labelledby="page-title">
               <p className="eyebrow">YOUR PRACTICE</p><h1 id="page-title">Habits</h1>
@@ -220,7 +225,7 @@ function App() {
               </section>
             )}
           </>
-        )}
+        ) : <InsightsPage data={data} today={today} onCreateHabit={() => setModal({ type: 'create' })} />}
 
         {page === 'today' && activeHabits.length > 0 && <ActivityHeatmap habits={data.habits} completions={data.completions} endDate={today} />}
 
